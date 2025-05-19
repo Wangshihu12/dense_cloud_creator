@@ -109,40 +109,51 @@ inline Vector3d rotm2axang(Matrix3d rotm)
 
 inline void closestGridDownsampling(PointCloud<PointXYZI>::Ptr rawPc, PointCloud<PointXYZI>& filteredPc, float gridSize)
 {
+    // 创建一个八叉树结构用于点云，设置体素大小为gridSize
     pcl::octree::OctreePointCloud<PointXYZI> octree(gridSize); // set voxel size
 
-    // Set the input point cloud to the octree
+    // 设置八叉树的输入点云
     octree.setInputCloud(rawPc);
 
-    // Construct the octree
+    // 构建八叉树结构（将点添加到八叉树中）
     octree.addPointsFromInputCloud();
 
-    // resize filtered pc
+    // 为过滤后的点云预分配内存，大小为八叉树的叶节点数量
+    // 每个叶节点代表一个网格单元，将输出一个点
     filteredPc.resize(octree.getLeafCount());
 
+    // 过滤后点云的点索引初始化为0
     int filId = 0;
 
-    // Use current time as seed for random generator
+    // 使用当前时间作为随机数生成器的种子
+    // 注意：虽然有这行代码，但该函数并没有使用随机数
     srand(time(0));
 
+    // 用于跟踪每个叶节点中最小强度值点的索引
     int minId;
 
+    // 遍历八叉树的所有叶节点
     for (auto it = octree.leaf_depth_begin(); it != octree.leaf_depth_end(); ++it)
     {
+        // 获取当前叶节点中所有点的索引
         std::vector<int> indices;
         it.getLeafContainer().getPointIndices(indices);
 
+        // 初始化最小强度值点的索引为第一个点
         minId = 0;
 
+        // 遍历叶节点中的所有点，寻找具有最小强度值的点
         for (int k = 0; k < indices.size(); ++k)
         {
+            // 如果当前点的强度值小于已找到的最小强度值点，更新最小索引
             if (rawPc->points[indices[k]].intensity < rawPc->points[indices[minId]].intensity) minId = k;
         }
 
-        // add point
+        // 将具有最小强度值的点添加到过滤后的点云中
+        // 这样每个网格单元（体素）只保留一个点，从而实现下采样
         filteredPc.points[filId] = rawPc->points[indices[minId]];
 
-        // update index
+        // 更新过滤后点云的索引，准备处理下一个体素
         ++filId;
     }
 }
